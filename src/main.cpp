@@ -26,8 +26,8 @@ void generate_items(Item *items, size_t n) {
 
 
 #define BENCH_OUTER 30 // to reduce noise in the timings
-#define BENCH_INNER 5 // to scale the amount of iterated items
-#define ITEMS_N 1'000'000
+#define BENCH_INNER 1 // to scale the amount of iterated items
+#define ITEMS_N 5'000'000
 
 
 double get_total(double *timings) {
@@ -107,6 +107,8 @@ int main() {
  *                                                                             *
  *******************************************************************************/
 
+    
+
     printf(
         "std::unordered_map  -  PUT  -  %u items @ %ux%u runs\n",
         ITEMS_N, BENCH_INNER, BENCH_OUTER
@@ -143,6 +145,11 @@ int main() {
 
         std::unordered_map<uint32_t, Item *> map;
         Item noopt_item;
+        
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+            map[item.id] = &item;
+        }
 
         for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
             nvPrecisionTimer_start(&timer);
@@ -152,6 +159,39 @@ int main() {
                     Item item = items[item_i];
 
                     noopt_item = *map[item.id];
+                }
+            }
+
+            nvPrecisionTimer_stop(&timer);
+            timings[bencho_i] = timer.elapsed;
+        }
+
+        print_timings(timings);
+    }
+
+    printf(
+        "\nstd::unordered_map  -  REMOVE  -  %u items @ %ux%u runs\n",
+        ITEMS_N, BENCH_INNER, BENCH_OUTER
+    );
+    {
+        nvPrecisionTimer timer;
+
+        std::unordered_map<uint32_t, Item *> map;
+        Item noopt_item;
+
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+            map[item.id] = &item;
+        }
+
+        for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
+            nvPrecisionTimer_start(&timer);
+
+            for (size_t benchi_i = 0; benchi_i < BENCH_INNER; benchi_i++) {
+                for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+                    Item item = items[item_i];
+
+                    map.erase(item.id);
                 }
             }
 
@@ -208,6 +248,12 @@ int main() {
         AP_DictInit(dict, (AP_HashFunc)&ap_hash, (AP_DictEqCheck)&ap_eq_check);
         Item *noopt_item;
 
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+
+            AP_DictSet(dict, &(item.id), &item);
+        }
+
         for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
             nvPrecisionTimer_start(&timer);
 
@@ -216,6 +262,42 @@ int main() {
                     Item item = items[item_i];
 
                     noopt_item = (Item *)AP_DictGet(dict, &(item.id));
+                }
+            }
+
+            nvPrecisionTimer_stop(&timer);
+            timings[bencho_i] = timer.elapsed;
+        }
+
+        print_timings(timings);
+        AP_DictFree(dict);
+    }
+
+    printf(
+        "\nAP_Dict  -  REMOVE  -  %u items @ %ux%u runs\n",
+        ITEMS_N, BENCH_INNER, BENCH_OUTER
+    );
+    {
+        nvPrecisionTimer timer;
+
+        AP_Dict *dict = (AP_Dict *)malloc(sizeof(AP_Dict));
+        AP_DictInit(dict, (AP_HashFunc)&ap_hash, (AP_DictEqCheck)&ap_eq_check);
+        Item *noopt_item;
+
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+
+            AP_DictSet(dict, &(item.id), &item);
+        }
+
+        for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
+            nvPrecisionTimer_start(&timer);
+
+            for (size_t benchi_i = 0; benchi_i < BENCH_INNER; benchi_i++) {
+                for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+                    Item item = items[item_i];
+
+                    AP_DictDel(dict, &(item.id));
                 }
             }
 
@@ -271,6 +353,12 @@ int main() {
         nvHashMap *map = nvHashMap_new(sizeof(Item), 0, nv_hash);
         Item *noopt_item;
 
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+
+            nvHashMap_set(map, &item);
+        }
+
         for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
             nvPrecisionTimer_start(&timer);
 
@@ -281,6 +369,43 @@ int main() {
                     Item search_item;
                     search_item.id = item.id;
                     noopt_item = (Item *)nvHashMap_get(map, &search_item);
+                }
+            }
+
+            nvPrecisionTimer_stop(&timer);
+            timings[bencho_i] = timer.elapsed;
+        }
+
+        print_timings(timings);
+        nvHashMap_free(map);
+    }
+
+    printf(
+        "\nnvHashmap  -  REMOVE  -  %u items @ %ux%u runs\n",
+        ITEMS_N, BENCH_INNER, BENCH_OUTER
+    );
+    {
+        nvPrecisionTimer timer;
+
+        nvHashMap *map = nvHashMap_new(sizeof(Item), 0, nv_hash);
+        Item *noopt_item;
+
+        for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+            Item item = items[item_i];
+
+            nvHashMap_set(map, &item);
+        }
+
+        for (size_t bencho_i = 0; bencho_i < BENCH_OUTER; bencho_i++) {
+            nvPrecisionTimer_start(&timer);
+
+            for (size_t benchi_i = 0; benchi_i < BENCH_INNER; benchi_i++) {
+                for (size_t item_i = 0; item_i < ITEMS_N; item_i++) {
+                    Item item = items[item_i];
+
+                    Item search_item;
+                    search_item.id = item.id;
+                    nvHashMap_remove(map, &search_item);
                 }
             }
 
